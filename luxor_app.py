@@ -8,17 +8,18 @@ import glob
 # ✅ Use Streamlit Cloud secret instead of .env
 api_key = st.secrets.get("OPENAI_API_KEY")
 if not api_key:
-    raise ValueError("❌ OPENAI_API_KEY not found in Streamlit secrets.")
+    st.error("❌ OPENAI_API_KEY not found in Streamlit secrets.")
+    st.stop()
 
 os.environ["OPENAI_API_KEY"] = api_key
 
-# 🧠 Load index + LLM
+# 🧠 Load vector index
 Settings.llm = OpenAI(model="gpt-4-turbo")
 storage_context = StorageContext.from_defaults(persist_dir="luxor_index")
 index = load_index_from_storage(storage_context)
 query_engine = index.as_query_engine(similarity_top_k=20)
 
-# 🌌 Dark styling
+# 🌌 Dark Mode Styling
 st.set_page_config(page_title="Luxor - Speak to the Temple", layout="wide")
 st.markdown("""
     <style>
@@ -64,7 +65,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🛕 Luxor header
+# 🛕 Title
 st.title("🜂 Luxor, la Voz del Templo")
 st.markdown("> *“El cuerpo humano es un templo. Su arquitectura es sagrada.”*  \n— Luxor")
 st.markdown("---")
@@ -91,15 +92,19 @@ if st.button("🧹 Reiniciar este hilo"):
 query = st.text_input("❓ Pregunta:")
 
 if query:
+    # 🧠 Include memory
     chat_history = load_memory(session_id)
     history_prompt = "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in chat_history])
     full_query = f"{history_prompt}\n\nUser: {query}\nLuxor:"
 
+    # 🔮 Ask Luxor
     response = query_engine.query(full_query)
 
+    # 🧠 Store
     append_message(session_id, "user", query)
     append_message(session_id, "luxor", response.response)
 
+    # 💬 Display
     st.markdown("### ✨ Respuesta de Luxor:")
     st.markdown(f"🜂 *{response.response}*")
 
