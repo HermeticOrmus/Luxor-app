@@ -2,6 +2,7 @@ import streamlit as st
 from llama_index.core import StorageContext, load_index_from_storage, Settings, VectorStoreIndex
 from llama_index.llms.openai import OpenAI
 import os
+import json
 from memory import load_memory, append_message, reset_memory
 import glob
 from custom_loader import load_pdf_with_metadata, load_docx_with_metadata
@@ -14,11 +15,22 @@ if not api_key:
 
 os.environ["OPENAI_API_KEY"] = api_key
 
-# 📦 Build index if missing
+# 🩺 Check if index exists and is valid
+
+def is_valid_json(path):
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            json.load(f)
+        return True
+    except Exception:
+        return False
+
+# 📦 Build index if missing or corrupted
 data_folder = "data"
 docstore_path = "luxor_index/docstore.json"
 
-if not os.path.exists(docstore_path):
+if not os.path.exists(docstore_path) or not is_valid_json(docstore_path):
+    st.warning("⚠️ Index missing or corrupted. Rebuilding Luxor's memory...")
     all_documents = []
     for filename in os.listdir(data_folder):
         filepath = os.path.join(data_folder, filename)
