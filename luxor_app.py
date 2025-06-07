@@ -2,23 +2,23 @@ import streamlit as st
 from llama_index.core import StorageContext, load_index_from_storage, Settings
 from llama_index.llms.openai import OpenAI
 import os
-from dotenv import load_dotenv
 from memory import load_memory, append_message, reset_memory
+import glob
 
-# 🌿 Load environment
-load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
+# ✅ Use Streamlit Cloud secret instead of .env
+api_key = st.secrets.get("OPENAI_API_KEY")
 if not api_key:
-    raise ValueError("❌ OPENAI_API_KEY not found. Check your .env file location.")
+    raise ValueError("❌ OPENAI_API_KEY not found in Streamlit secrets.")
+
 os.environ["OPENAI_API_KEY"] = api_key
 
-# 🧠 Load vector index
+# 🧠 Load index + LLM
 Settings.llm = OpenAI(model="gpt-4-turbo")
 storage_context = StorageContext.from_defaults(persist_dir="luxor_index")
 index = load_index_from_storage(storage_context)
 query_engine = index.as_query_engine(similarity_top_k=20)
 
-# 🌌 Dark Mode Styling
+# 🌌 Dark styling
 st.set_page_config(page_title="Luxor - Speak to the Temple", layout="wide")
 st.markdown("""
     <style>
@@ -64,39 +64,44 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 🛕 Title
+# 🛕 Luxor header
 st.title("🜂 Luxor, la Voz del Templo")
 st.markdown("> *“El cuerpo humano es un templo. Su arquitectura es sagrada.”*  \n— Luxor")
 st.markdown("---")
 
-# 🗂️ Conversation memory
-session_id = st.text_input("📁 Nombre del hilo (conversación):", value="default")
+# 🗂️ Session browser
+session_files = sorted(glob.glob("conversations/*.json"))
+session_names = [os.path.splitext(os.path.basename(f))[0] for f in session_files]
 
-if st.button("🧹 Reiniciar conversación"):
+st.markdown("### 📁 Selecciona o crea un hilo de conversación:")
+
+selected = st.selectbox("Hilos disponibles:", options=session_names + ["Nuevo hilo..."], index=0)
+
+if selected == "Nuevo hilo...":
+    new_session = st.text_input("✍️ Nombre para el nuevo hilo:", value="")
+    session_id = new_session if new_session else "default"
+else:
+    session_id = selected
+
+if st.button("🧹 Reiniciar este hilo"):
     reset_memory(session_id)
-    st.success("Memoria limpiada.")
+    st.success(f"🧼 Memoria del hilo '{session_id}' limpiada.")
 
 # 🌀 User Input
 query = st.text_input("❓ Pregunta:")
 
 if query:
-    # 🧠 Include memory as context
     chat_history = load_memory(session_id)
     history_prompt = "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in chat_history])
-
     full_query = f"{history_prompt}\n\nUser: {query}\nLuxor:"
 
-    # 🔮 Ask Luxor
     response = query_engine.query(full_query)
 
-    # 🧠 Store memory
     append_message(session_id, "user", query)
     append_message(session_id, "luxor", response.response)
 
-    # 💬 Display Answer
     st.markdown("### ✨ Respuesta de Luxor:")
-    with st.container():
-        st.markdown(f"🜂 *{response.response}*")
+    st.markdown(f"🜂 *{response.response}*")
 
     st.markdown("### 📜 Fuentes:")
     for node in response.source_nodes:
