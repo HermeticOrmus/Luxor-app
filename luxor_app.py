@@ -1,9 +1,10 @@
 import streamlit as st
-from llama_index.core import StorageContext, load_index_from_storage, Settings
+from llama_index.core import StorageContext, load_index_from_storage, Settings, VectorStoreIndex
 from llama_index.llms.openai import OpenAI
 import os
 from memory import load_memory, append_message, reset_memory
 import glob
+from custom_loader import load_pdf_with_metadata, load_docx_with_metadata
 
 # ✅ Use Streamlit Cloud secret instead of .env
 api_key = st.secrets.get("OPENAI_API_KEY")
@@ -13,10 +14,26 @@ if not api_key:
 
 os.environ["OPENAI_API_KEY"] = api_key
 
-# 🧠 Load vector index
+# 📦 Build index if missing
+data_folder = "data"
+docstore_path = "luxor_index/docstore.json"
+
+if not os.path.exists(docstore_path):
+    all_documents = []
+    for filename in os.listdir(data_folder):
+        filepath = os.path.join(data_folder, filename)
+        if filename.lower().endswith(".pdf"):
+            all_documents.extend(load_pdf_with_metadata(filepath))
+        elif filename.lower().endswith(".docx"):
+            all_documents.extend(load_docx_with_metadata(filepath))
+
+    index = VectorStoreIndex.from_documents(all_documents)
+    index.storage_context.persist(persist_dir="luxor_index")
+else:
+    storage_context = StorageContext.from_defaults(persist_dir="luxor_index")
+    index = load_index_from_storage(storage_context)
+
 Settings.llm = OpenAI(model="gpt-4-turbo")
-storage_context = StorageContext.from_defaults(persist_dir="luxor_index")
-index = load_index_from_storage(storage_context)
 query_engine = index.as_query_engine(similarity_top_k=20)
 
 # 🌌 Dark Mode Styling
