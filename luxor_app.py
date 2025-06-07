@@ -3,6 +3,7 @@ from llama_index.core import StorageContext, load_index_from_storage, Settings, 
 from llama_index.llms.openai import OpenAI
 import os
 import json
+import shutil
 from memory import load_memory, append_message, reset_memory
 import glob
 from custom_loader import load_pdf_with_metadata, load_docx_with_metadata
@@ -31,6 +32,12 @@ docstore_path = "luxor_index/docstore.json"
 
 if not os.path.exists(docstore_path) or not is_valid_json(docstore_path):
     st.warning("⚠️ Index missing or corrupted. Rebuilding Luxor's memory...")
+
+    # Clean corrupted index directory
+    if os.path.exists("luxor_index"):
+        shutil.rmtree("luxor_index")
+    os.makedirs("luxor_index", exist_ok=True)
+
     all_documents = []
     for filename in os.listdir(data_folder):
         filepath = os.path.join(data_folder, filename)
